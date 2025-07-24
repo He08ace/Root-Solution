@@ -1,91 +1,68 @@
 import streamlit as st
 import requests
-import io
-from docx import Document
 import base64
+from docx import Document
+import os
+
+# Get ElevenLabs API key from Streamlit secrets
+API_KEY = st.secrets["elevenlabs"]["api_key"]
+
+# ElevenLabs endpoint
+TTS_ENDPOINT = "https://api.elevenlabs.io/v1/text-to-speech"
 
 # Set page config
-st.set_page_config(page_title="Audiobook TTS Reader", layout="centered")
+st.set_page_config(page_title="📖 Audiobook Reader", layout="centered")
 
-st.title("📖 Audiobook TTS Reader")
-st.markdown("Turn text or chapters into audio using ElevenLabs voices.")
+st.title("📖 Text-to-Speech Audiobook Reader")
 
-# Sidebar for API key and voice selection
-st.sidebar.header("🔧 Settings")
-api_key = st.sidebar.text_input("ElevenLabs API Key", type="password")
+# Sidebar settings
+st.sidebar.title("🔧 Settings")
 
-# Get available voices
-def get_voices(api_key):
-    headers = {
-        "xi-api-key": api_key
-    }
-    response = requests.get("https://api.elevenlabs.io/v1/voices", headers=headers)
-    if response.status_code == 200:
-        voices = response.json().get("voices", [])
-        return {voice["name"]: voice["voice_id"] for voice in voices}
-    return {}
+# Select voice from dropdown (update as needed)
+voice_options = {
+    "Rachel": "21m00Tcm4TlvDq8ikWAM", 
+    "Domi": "AZnzlk1XvdvUeBnXmlld", 
+    "Bella": "EXAVITQu4vr4xnSDxMaL"
+}
+voice_name = st.sidebar.selectbox("Choose a voice:", list(voice_options.keys()))
+voice_id = voice_options[voice_name]
 
-voices = get_voices(api_key) if api_key else {}
-voice_names = list(voices.keys()) if voices else []
+# Upload or paste text
+uploaded_file = st.file_uploader("📄 Upload a .txt or .docx file", type=["txt", "docx"])
+text_input = st.text_area("📝 Or paste your text here", height=200)
 
-# Text input or file upload
-st.subheader("Step 1: Input your content")
-text_input = st.text_area("✍️ Paste your text here", height=200)
-
-uploaded_file = st.file_uploader("📄 Or upload a .txt or .docx file", type=["txt", "docx"])
-file_text = ""
-
-if uploaded_file:
-    try:
-        if uploaded_file.name.endswith(".txt"):
-            file_text = uploaded_file.read().decode("utf-8")
-        elif uploaded_file.name.endswith(".docx"):
-            doc = Document(uploaded_file)
-            file_text = "\n".join([para.text for para in doc.paragraphs])
-    except Exception as e:
-        st.error(f"Error reading file: {e}")
-
-# Choose source text
-text = text_input or file_text
-
-if text:
-    st.subheader("Step 2: Choose Voice")
-    if not voices:
-        st.warning("⚠️ Please enter a valid ElevenLabs API key in the sidebar.")
+def read_uploaded_file(file):
+    if file.name.endswith(".txt"):
+        return file.read().decode("utf-8")
+    elif file.name.endswith(".docx"):
+        doc = Document(file)
+        return "\n".join([para.text for para in doc.paragraphs])
     else:
-        selected_voice_name = st.selectbox("🎤 Choose a voice", voice_names)
-        selected_voice_id = voices[selected_voice_name]
+        return ""
 
-        if st.button("▶️ Generate Audio"):
-            with st.spinner("Generating audio..."):
-                headers = {
-                    "xi-api-key": api_key,
-                    "Content-Type": "application/json"
-                }
-                payload = {
-                    "text": text,
-                    "model_id": "eleven_monolingual_v1",
-                    "voice_settings": {
-                        "stability": 0.5,
-                        "similarity_boost": 0.75
-                    }
-                }
+def generate_audio(text, voice_id):
+    headers = {
+        "xi-api-key": API_KEY,
+        "Content-Type": "application/json"
+    }
 
-                response = requests.post(
-                    f"https://api.elevenlabs.io/v1/text-to-speech/{selected_voice_id}",
-                    headers=headers,
-                    json=payload
-                )
+    data = {
+        "text": text,
+        "voice_settings": {
+            "stability": 0.75,
+            "similarity_boost": 0.75
+        }
+    }
 
-                if response.status_code == 200:
-                    audio_bytes = response.content
-                    st.audio(audio_bytes, format="audio/mp3")
+    url = f"{TTS_ENDPOINT}/{voice_id}/stream"
+    response = requests.post(url, headers=headers, json=data)
 
-                    # Download link
-                    b64 = base64.b64encode(audio_bytes).decode()
-                    href = f'<a href="data:audio/mp3;base64,{b64}" download="audiobook.mp3">💾 Download MP3</a>'
-                    st.markdown(href, unsafe_allow_html=True)
-                else:
-                    st.error(f"⚠️ Failed to generate audio: {response.status_code} - {response.text}")
-else:
-    st.warning("⚠️ Please upload a file or enter some text.")
+    if response.status_code == 200:
+        return response.content
+    else:
+        st.error(f"⚠️ Failed to generate audio: {response.status_code} - {response.text}")
+        return None
+
+# Main logic
+if uploaded_file:
+    text = read_uploaded_file
