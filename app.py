@@ -12,7 +12,7 @@ st.markdown("Turn text or chapters into audio using ElevenLabs voices.")
 
 # Sidebar for API key and voice selection
 st.sidebar.header("🔧 Settings")
-api_key = st.sidebar.text_input("ELEVENLABS_API_KEY = "sk_d58c4c8cf3e18fece726e6664db6f9efae76ed2de3cb893c")
+api_key = st.sidebar.text_input(ELEVENLABS_API_KEY = "sk_d58c4c8cf3e18fece726e6664db6f9efae76ed2de3cb893c")
 
 # Get available voices
 def get_voices(api_key):
