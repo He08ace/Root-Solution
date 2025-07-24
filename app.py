@@ -59,4 +59,9 @@ def get_audio_from_elevenlabs(text, voice_id):
 # --- Generate & Play Audio ---
 if st.button("▶️ Play with ElevenLabs Voice"):
     if not raw_text:
-        st.warning("⚠️ Please upload a file
+        st.warning("⚠️ Please upload a file or enter text.")
+    else:
+        with st.spinner("🌀 Generating audio..."):
+            audio_bytes = get_audio_from_elevenlabs(raw_text, voice_id)
+            if audio_bytes:
+                st.audio(audio_bytes, format="audio/mp3")
